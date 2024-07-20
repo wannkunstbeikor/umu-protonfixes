@@ -12,13 +12,17 @@ import zipfile
 import subprocess
 import urllib.request
 import functools
-
 from socket import socket, AF_INET, SOCK_DGRAM
 from typing import Union, Literal, Mapping
 
-from .logger import log
-from .steamhelper import install_app
-from . import config
+try:
+    from . import config
+    from .logger import log
+    from .steamhelper import install_app
+except ImportError:
+    import config
+    from logger import log
+    from steamhelper import install_app
 
 try:
     import __main__ as protonmain
@@ -442,13 +446,15 @@ def disable_fsync() -> None:
     set_environment('WINEFSYNC', '')
 
 
-def disable_protonaudioconverter() -> None:
-    """ Disabling Proton Audio Converter
+def disable_protonmediaconverter() -> None:
+    """ Disabling Proton Media Converter
     """
 
-    log.info('Disabling Proton Audio Converter')
-    set_environment('GST_PLUGIN_FEATURE_RANK', 'protonaudioconverterbin:NONE')
-
+    log.info('Disabling Proton Media Converter')
+    set_environment('PROTON_AUDIO_CONVERT', '0')
+    set_environment('PROTON_AUDIO_CONVERT_BIN', '0')
+    set_environment('PROTON_VIDEO_CONVERT', '0')
+    set_environment('PROTON_DEMUX', '0')
 
 @once
 def disable_uplay_overlay() -> bool:
