@@ -1,8 +1,9 @@
-""" Game fix for Riddle Joker
-"""
+"""Game fix for Riddle Joker"""
+
 from protonfixes import util
 
-def main():
+
+def main() -> None:
     """Install quartz, wmp11, qasf
 
     Fixes in-game video playback for the intro and ending.

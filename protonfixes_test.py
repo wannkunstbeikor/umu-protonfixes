@@ -1,14 +1,13 @@
-# pylint: disable=C0114
-import unittest
 import os
 import tempfile
-from pathlib import Path
-from unittest.mock import patch
-import io
-import urllib.request
-import fix
+import unittest
 
-# pylint: disable=C0115,R0904
+from pathlib import Path
+from unittest.mock import patch, mock_open
+
+from . import fix
+
+
 class TestProtonfixes(unittest.TestCase):
     def setUp(self):
         self.env = {
@@ -17,10 +16,18 @@ class TestProtonfixes(unittest.TestCase):
             'SteamGameId': '',
             'STEAM_COMPAT_DATA_PATH': '',
             'UMU_ID': '',
-            'DEBUG': ''
+            'DEBUG': '',
         }
         self.game_id = '1293820'
         self.pfx = Path(tempfile.mkdtemp())
+        self.db = Path(tempfile.mktemp())
+        self.db_data = (
+            "TITLE,STORE,CODENAME,UMU_ID,COMMON ACRONYM (Optional),NOTE (Optional)\n"
+            "Age of Wonders,gog,1207658883,umu-61500,aow,\n"
+            "Age of Wonders,humble,ageofwonders,umu-61500,aow,\n"
+            "Red Dead Redemption 2,none,none,umu-1174180,rdr2,Standalone Rockstar installer"
+        )
+        self.db.write_text(self.db_data, encoding="utf-8")
 
     def tearDown(self):
         for key in self.env:
@@ -28,14 +35,18 @@ class TestProtonfixes(unittest.TestCase):
                 os.environ.pop(key)
         if self.pfx.is_dir():
             if self.pfx.joinpath('steamapps').is_dir():
-                self.pfx.joinpath('steamapps', 'appmanifest_1628350.acf').unlink(missing_ok=True)
+                self.pfx.joinpath('steamapps', 'appmanifest_1628350.acf').unlink(
+                    missing_ok=True
+                )
                 self.pfx.joinpath('steamapps').rmdir()
             self.pfx.joinpath('game_title').unlink(missing_ok=True)
             self.pfx.rmdir()
+        Path(self.db).unlink(missing_ok=True)
+
 
     def testModuleName(self):
         """Pass a non-numeric game id
-        
+
         Expects a string that refers to a module in gamefixes-umu
         """
         game_id = 'umu-default'
@@ -44,7 +55,7 @@ class TestProtonfixes(unittest.TestCase):
 
     def testModuleNameNum(self):
         """Pass a numeric game id
-        
+
         In this case, it's assumed the game is from Steam when the game id is
         numeric
         Expects a string that refers to a module in gamefixes-steam
@@ -55,7 +66,7 @@ class TestProtonfixes(unittest.TestCase):
 
     def testModuleNameNoneAndNumeric(self):
         """Pass a numeric gameid and set STORE
-        
+
         In this case, when the game id is numeric, we always refer to a
         module in the gamefixes-steam.
         """
@@ -66,7 +77,7 @@ class TestProtonfixes(unittest.TestCase):
 
     def testModuleNameStoreAndNumeric(self):
         """Pass a numeric gameid and set STORE
-        
+
         In this case, when the game id is numeric, we always refer to a
         module in gamefixes-steam
         When passed a valid store, that value should not be used
@@ -76,10 +87,9 @@ class TestProtonfixes(unittest.TestCase):
         result = fix.get_module_name(game_id)
         self.assertEqual(result, f'protonfixes.gamefixes-steam.{game_id}')
 
-
     def testModuleNameStore(self):
         """Pass a non-numeric game id and setting valid STORE
-        
+
         For non-numeric game ids, the umu database should always be referenced
         Expects a string that refers to a module in gamefixes-$STORE
         """
@@ -90,7 +100,7 @@ class TestProtonfixes(unittest.TestCase):
 
     def testModuleNameNoStore(self):
         """Pass a non-numeric game id and setting an invalid STORE
-        
+
         Expects a string that refers to a module in gamefixes-umu
         """
         os.environ['STORE'] = 'foo'
@@ -100,7 +110,7 @@ class TestProtonfixes(unittest.TestCase):
 
     def testModuleNameStoreEmpty(self):
         """Pass a non-numeric game id and setting an empty store
-        
+
         Expects a string that refers to a module in gamefixes-umu
         """
         os.environ['STORE'] = ''
@@ -132,7 +142,7 @@ class TestProtonfixes(unittest.TestCase):
 
     def testModuleNameLocalDefault(self):
         """Pass a gameid and set local=True,default=True
-        
+
         In this case, the game id will be completely ignored
         """
         game_id = '1091500'
@@ -141,13 +151,13 @@ class TestProtonfixes(unittest.TestCase):
 
     def testGetGameSteamAppId(self):
         """Only set the SteamAppId
-        
+
         Protonfixes depends on being supplied an app id when applying fixes
         to games.
-        
+
         This appid is typically set by a client application, but the user can
         set it in some cases (e.g., umu-launcher).
-        
+
         If the app id is numeric, then protonfixes will refer to the
         gamefixes-steam folder. Otherwise, the STORE environment variable will
         be used to determine which fix will be applied.
@@ -176,27 +186,31 @@ class TestProtonfixes(unittest.TestCase):
         os.environ['STEAM_COMPAT_DATA_PATH'] = self.game_id
         result = fix.get_game_id()
         self.assertEqual(result, self.game_id)
-        self.assertTrue(os.environ.get('STEAM_COMPAT_DATA_PATH'), 'STEAM_COMPAT_DATA_PATH was unset')
+        self.assertTrue(
+            os.environ.get('STEAM_COMPAT_DATA_PATH'), 'STEAM_COMPAT_DATA_PATH was unset'
+        )
 
     def testGetGameNone(self):
         """Set no environment variables
-        
+
         Expect None to be returned
         """
         func = fix.get_game_id.__wrapped__  # Do not reference the cache
-        self.assertTrue('STEAM_COMPAT_DATA_PATH' not in os.environ, 'STEAM_COMPAT_DATA_PATH is set')
+        self.assertTrue(
+            'STEAM_COMPAT_DATA_PATH' not in os.environ, 'STEAM_COMPAT_DATA_PATH is set'
+        )
         self.assertTrue('SteamGameId' not in os.environ, 'SteamGameId is set')
         self.assertTrue('UMU_ID' not in os.environ, 'UMU_ID is set')
         self.assertTrue('SteamAppId' not in os.environ, 'SteamAppId is set')
-        result = func()
-        self.assertFalse(result, 'None was not returned')
+        with self.assertRaises(SystemExit):
+            func()
 
     def testGetStoreNameZoom(self):
         """Pass zoomplatform as store name
-        
+
         The get_store_name function returns a string associated with a
         supported store in the umu database.
-        
+
         The string will be used to display a message in the console to let the
         user know which fix will be applied.
         """
@@ -272,129 +286,124 @@ class TestProtonfixes(unittest.TestCase):
         result = fix.get_store_name(store)
         self.assertFalse(result, 'Expected None')
 
-    def testGetGameName(self):
-        """Set UMU_ID and access the game_title file for its title
-        
-        The get_game_name function returns a string of the running game's
-        title.
-        
-        It checks a few system paths in the user's system to try to
-        determine it, and makes a callout to an owc endpoint to get an
-        official title by its UMU_ID.
-        """
-        os.environ['UMU_ID'] = self.game_id
-        os.environ['WINEPREFIX'] = self.pfx.as_posix()
-        self.pfx.joinpath('game_title').touch()
-        result = fix.get_game_name()
-        self.assertFalse(result, 'Expected an empty string')
-
     def testGetGameNameDB(self):
-        """Set UMU_ID and access umu database
-        
-        Makes a request to the umu database for a title name to be displayed
-        if a UMU_ID is supplied. This function should be fail safe in case of
-        a TimeoutError, OSError, IndexError or UnicodeDecodeError
-        """
+        """Set UMU_ID and access umu database"""
         os.environ['UMU_ID'] = 'umu-35140'
+        os.environ['STORE'] = 'gog'
         os.environ['WINEPREFIX'] = self.pfx.as_posix()
-        # Mock a valid umu db response
-        data = '[{"title":"Batman: Arkham Asylum Game of the Year Edition","umu_id":"umu-35140","acronym":null,"codename":"1482504285","store":"gog","notes":null},{"title":"Batman: Arkham Asylum Game of the Year Edition","umu_id":"umu-35140","acronym":null,"codename":"godwit","store":"egs","notes":null}]'
-        data = io.StringIO(data)
-        with (
-            patch.object(fix, 'check_internet', return_value=True),
-            patch.object(urllib.request, 'urlopen', return_value=data)
-        ):
+
+        # Mock CSV content
+        csv_content = """Batman: Arkham Asylum Game of the Year Edition,gog,1482504285,umu-35140,,"""
+
+        with patch('builtins.open', mock_open(read_data=csv_content)):
             func = fix.get_game_name.__wrapped__  # Do not reference the cache
             result = func()
             self.assertEqual(result, 'Batman: Arkham Asylum Game of the Year Edition')
 
-    def testGetGameNameDBTimeout(self):
-        """Set UMU_ID and access umu database
-        
-        Mock the TimeoutError
-        """
+    def testGetGameNameDBFileNotFound(self):
+        """Set UMU_ID and simulate FileNotFoundError for the CSV file"""
         os.environ['UMU_ID'] = 'umu-35140'
+        os.environ['STORE'] = 'gog'
         os.environ['WINEPREFIX'] = self.pfx.as_posix()
-        # Mock a valid umu db response
-        with (
-            patch.object(fix, 'check_internet', return_value=True),
-            patch.object(urllib.request, 'urlopen') as mock_function
-        ):
-            mock_function.side_effect = TimeoutError
-            func = fix.get_game_name.__wrapped__  # Do not reference the cache
-            result = func()
-            self.assertEqual(result, 'UNKNOWN')
+
+        with patch('builtins.open', mock_open()) as mocked_open:
+            mocked_open.side_effect = FileNotFoundError
+            with patch('protonfixes.fix.log') as mocked_log:  # Mock the logger separately
+                func = fix.get_game_name.__wrapped__  # Do not reference the cache
+                result = func()
+                self.assertEqual(result, 'UNKNOWN')
+                mocked_log.warn.assert_called_with(f"Game title not found in CSV")
 
     def testGetGameNameDbOS(self):
-        """Set UMU_ID and access umu database
-        
-        Mock the OSError, which only shown if debugging is enabled
-        """
+        """Set UMU_ID and simulate OSError when accessing the CSV file"""
         os.environ['UMU_ID'] = 'umu-35140'
+        os.environ['STORE'] = 'gog'
         os.environ['WINEPREFIX'] = self.pfx.as_posix()
-        os.environ['DEBUG'] = '1'
-        # Mock a valid umu db response
-        with (
-            patch.object(fix, 'check_internet', return_value=True),
-            patch.object(urllib.request, 'urlopen') as mock_function
-        ):
-            mock_function.side_effect = OSError
-            func = fix.get_game_name.__wrapped__  # Do not reference the cache
-            result = func()
-            self.assertEqual(result, 'UNKNOWN')
+
+        with patch('builtins.open', mock_open()) as mocked_open:
+            mocked_open.side_effect = OSError
+            with patch('protonfixes.fix.log') as mocked_log:  # Mock the logger separately
+                func = fix.get_game_name.__wrapped__  # Do not reference the cache
+                result = func()
+                self.assertEqual(result, 'UNKNOWN')
+                mocked_log.warn.assert_called_with("Game title not found in CSV")
 
     def testGetGameNameDbIndex(self):
-        """Set UMU_ID and access umu database
-        
-        Mock the IndexError
-        """
+        """Set UMU_ID and simulate IndexError with malformed CSV data"""
         os.environ['UMU_ID'] = 'umu-35140'
+        os.environ['STORE'] = 'gog'
         os.environ['WINEPREFIX'] = self.pfx.as_posix()
-        os.environ['DEBUG'] = '1'
-        # Mock a valid umu db response
-        with (
-            patch.object(fix, 'check_internet', return_value=True),
-            patch.object(urllib.request, 'urlopen') as mock_function
-        ):
-            mock_function.side_effect = IndexError
+
+        # Mock CSV content with missing columns
+        csv_content = """Batman: Arkham Asylum Game of the Year Edition,gog"""
+
+        with patch('builtins.open', mock_open(read_data=csv_content)):
             func = fix.get_game_name.__wrapped__  # Do not reference the cache
             result = func()
             self.assertEqual(result, 'UNKNOWN')
 
     def testGetGameNameDbUnicode(self):
-        """Set UMU_ID and access umu database
-        
-        Mock the UnicodeError
-        """
+        """Set UMU_ID and simulate UnicodeDecodeError when reading the CSV file"""
         os.environ['UMU_ID'] = 'umu-35140'
+        os.environ['STORE'] = 'gog'
         os.environ['WINEPREFIX'] = self.pfx.as_posix()
-        os.environ['DEBUG'] = '1'
-        def mock_urlopen_raise_error(*args, **kwargs):
-            raise UnicodeDecodeError('utf-8', b'', 0, 1, '')
-        # Mock a valid umu db response
-        with (
-            patch.object(fix, 'check_internet', return_value=True),
-            patch.object(urllib.request, 'urlopen') as mock_function
-        ):
-            mock_function.side_effect = mock_urlopen_raise_error
-            func = fix.get_game_name.__wrapped__  # Do not reference the cache
-            result = func()
-            self.assertEqual(result, 'UNKNOWN')
+
+        with patch('builtins.open', mock_open()) as mocked_open:
+            mocked_open.side_effect = UnicodeDecodeError('utf-8', b'', 0, 1, '')
+            with patch('protonfixes.fix.log') as mocked_log:  # Mock the logger separately
+                func = fix.get_game_name.__wrapped__  # Do not reference the cache
+                result = func()
+                self.assertEqual(result, 'UNKNOWN')
+                mocked_log.warn.assert_called_with("Game title not found in CSV")
 
     def testGetGameNameNoManifest(self):
-        """Do not set UMU_ID and try to get the title from the steam app
-        library
-
-        UNKNOWN should be returned because no manifest file will exist in the
-        test directory
-        """
+        """Do not set UMU_ID and try to get the title from the steam app library"""
         os.environ['SteamAppId'] = '1628350'
         os.environ['WINEPREFIX'] = self.pfx.as_posix()
         os.environ['PWD'] = os.environ['WINEPREFIX']
         steamapps = self.pfx.joinpath('steamapps')
-        steamapps.mkdir()
+        os.makedirs(steamapps, exist_ok=True)
         func = fix.get_game_name.__wrapped__  # Do not reference the cache
         result = func()
+        self.assertEqual(result, 'UNKNOWN')
+
+    def testGetTitleNameNoStore(self):
+        """Pass a valid game id with a database entry but with no store
+
+        Expects a string that refers to the game's title when STORE is falsey
+        or unset when reading the CSV file
+        """
+        os.environ['WINEPREFIX'] = self.pfx.as_posix()
+        os.environ['STORE'] = ''
+        os.environ["UMU_ID"] = 'umu-1174180'
+        result = fix.get_game_title(self.db.as_posix())
+        self.assertEqual(result, 'Red Dead Redemption 2')
+
+        # STORE is unset
+        os.environ.pop('STORE')
+        result = fix.get_game_title(self.db.as_posix())
+        self.assertEqual(result, 'Red Dead Redemption 2')
+
+    def testGetTitleNameNoEntry(self):
+        """Pass a game id with no database entry
+
+        Expects the string 'UNKNOWN' when STORE is falsey, unset or valid
+        when reading the CSV file
+        """
+        os.environ['WINEPREFIX'] = self.pfx.as_posix()
+        os.environ['STORE'] = ''
+        os.environ["UMU_ID"] = 'umu-default'
+        result = fix.get_game_title(self.db.as_posix())
+        self.assertEqual(result, 'UNKNOWN')
+
+        # STORE is unset
+        os.environ.pop('STORE')
+        result = fix.get_game_title(self.db.as_posix())
+        self.assertEqual(result, 'UNKNOWN')
+
+        # STORE is valid
+        os.environ['STORE'] = 'gog'
+        result = fix.get_game_title(self.db.as_posix())
         self.assertEqual(result, 'UNKNOWN')
 
 if __name__ == '__main__':

@@ -1,3 +1,8 @@
+# Builing umu-protonfixes binaries
+builddir/
+dist/
+subprojects/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -115,3 +120,6 @@ deploy.sh
 
 # vscode
 .vscode
+
+# pycharm
+.idea

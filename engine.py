@@ -1,22 +1,23 @@
-""" Game engine API
-"""
+"""Game engine API"""
 
 import os
 import sys
-from .logger import log
 
-class Engine():
-    """ Game engines
-    """
+from .logger import log, LogLevel
+
+
+class Engine:
+    """Game engines"""
 
     def __init__(self) -> None:
-        self.engine_name = None
+        """Trys to figure out which engine is used in the current game"""
+        self.engine_name = ''
         self.supported = {
             'Dunia 2': 'https://pcgamingwiki.com/wiki/Engine:Dunia_2',
             'Unity': 'https://pcgamingwiki.com/wiki/Engine:Unity',
-            'RAGE' : 'https://pcgamingwiki.com/wiki/Grand_Theft_Auto_IV#Launch_Options',
-            'UE3'  : 'https://pcgamingwiki.com/wiki/Engine:Unreal_Engine_3',
-            'UE4'  : 'https://pcgamingwiki.com/wiki/Engine:Unreal_Engine_4'
+            'RAGE': 'https://pcgamingwiki.com/wiki/Grand_Theft_Auto_IV#Launch_Options',
+            'UE3': 'https://pcgamingwiki.com/wiki/Engine:Unreal_Engine_3',
+            'UE4': 'https://pcgamingwiki.com/wiki/Engine:Unreal_Engine_4',
         }
 
         # Autodetection
@@ -34,22 +35,16 @@ class Engine():
         else:
             log.info('Engine: unknown Game engine')
 
-        if self.engine_name is not None:
+        if self.engine_name:
             log.info('Engine: ' + self.engine_name)
             log.info('Engine: ' + self.supported[self.engine_name])
 
-
     def _add_argument(self, args: str = '') -> None:
-        """ Set command line arguments
-        """
-
+        """Set command line arguments"""
         sys.argv += args.split(' ')
 
-
     def _is_unity(self) -> bool:
-        """ Detect Unity engine
-        """
-
+        """Detect Unity engine"""
         dir_list = os.listdir(os.environ['PWD'])
         data_list = list(filter(lambda item: 'Data' in item, dir_list))
 
@@ -60,74 +55,54 @@ class Engine():
 
         return False
 
-
     def _is_dunia2(self) -> bool:
-        """ Detect Dunia 2 engine (Far Cry >= 3)
-        """
-
+        """Detect Dunia 2 engine (Far Cry >= 3)"""
         dir_list = os.listdir(os.environ['PWD'])
         data_list = list(filter(lambda item: 'data_win' in item, dir_list))
 
         # Check .../data_win*/worlds/multicommon dir
         for data_dir in data_list:
-            if os.path.exists(os.path.join(os.environ['PWD'], data_dir, 'worlds/multicommon')):
+            if os.path.exists(
+                os.path.join(os.environ['PWD'], data_dir, 'worlds/multicommon')
+            ):
                 return True
 
         return False
 
-
     def _is_rage(self) -> bool:
-        """ Detect RAGE engine (GTA IV/V)
-        """
+        """Detect RAGE engine (GTA IV/V)"""
+        #        dir_list = os.listdir(os.environ['PWD'])
 
-#        dir_list = os.listdir(os.environ['PWD'])
-
-#        # Check .../*/pc/data/cdimages dir
-#        for data_dir in dir_list:
-#            if os.path.exists(os.path.join(os.environ['PWD'], data_dir, 'pc/data/cdimages')):
-#                return True
+        #        # Check .../*/pc/data/cdimages dir
+        #        for data_dir in dir_list:
+        #            if os.path.exists(os.path.join(os.environ['PWD'], data_dir, 'pc/data/cdimages')):
+        #                return True
         if os.path.exists(os.path.join(os.environ['PWD'], 'pc/data/cdimages')):
             return True
 
         return False
 
-
     def _is_ue3(self) -> bool:
-        """ Detect Unreal Engine 3
-        """
-
+        """Detect Unreal Engine 3"""
         return False
-
 
     def _is_ue4(self) -> bool:
-        """ Detect Unreal Engine 4
-        """
-
+        """Detect Unreal Engine 4"""
         return False
 
-
-    def _log(self, ctx: str, msg: str, warn: bool = False) -> None:
-        """ Log wrapper
-        """
-
+    def _log(self, ctx: str, msg: str, level: LogLevel = LogLevel.INFO) -> None:
+        """Log wrapper"""
         if self.engine_name is None:
             log.warn(ctx + ': Engine not defined')
             return
-
-        log_func = log.warn if warn else log.info
-        log_func(f'{self.engine_name}: {ctx}: {msg}')
-
+        log.log(f'{self.engine_name}: {ctx}: {msg}', level)
 
     def name(self) -> str:
-        """ Report Engine name
-        """
+        """Report Engine name"""
         return self.engine_name
 
-
-    def set(self, _engine: str = None) -> bool:
-        """ Force engine
-        """
-
+    def set(self, _engine: str) -> bool:
+        """Force engine"""
         if _engine in self.supported:
             self.engine_name = _engine
             self._log('set', 'forced')
@@ -136,66 +111,51 @@ class Engine():
             return False
         return True
 
-
     def nosplash(self) -> bool:
-        """ Disable splash screen
-        """
-
+        """Disable splash screen"""
         if self.engine_name == 'UE3':
             self._add_argument('-nosplash')
             self._log('nosplash', 'splash screen disabled')
         else:
-            self._log('nosplash', 'not supported', True)
+            self._log('nosplash', 'not supported', LogLevel.WARN)
             return False
         return True
 
-
     def info(self) -> bool:
-        """ Show some information about engine
-        """
-
+        """Show some information about engine"""
         if self.engine_name == 'RAGE':
             self._add_argument('-help')
             self._log('info', 'command line arguments')
         else:
-            self._log('info', 'not supported', True)
+            self._log('info', 'not supported', LogLevel.WARN)
             return False
         return True
 
-
     def nointro(self) -> bool:
-        """ Skip intro videos
-        """
-
+        """Skip intro videos"""
         if self.engine_name == 'UE3':
             self._add_argument('-nostartupmovies')
             self._log('nointro', 'intro videos disabled')
-        elif self.engine_name is 'Dunia 2':
+        elif self.engine_name == 'Dunia 2':
             self._add_argument('-skipintro')
             self._log('nointro', 'intro videos disabled')
         else:
-            self._log('nointro', 'not supported', True)
+            self._log('nointro', 'not supported', LogLevel.WARN)
             return False
         return True
 
-
     def launcher(self) -> bool:
-        """ Force launcher
-        """
-
+        """Force launcher"""
         if self.engine_name == 'Unity':
             self._add_argument('-show-screen-selector')
             self._log('launcher', 'forced')
         else:
-            self._log('launcher', 'not supported', True)
+            self._log('launcher', 'not supported', LogLevel.WARN)
             return False
         return True
 
-
     def windowed(self) -> bool:
-        """ Force windowed mode
-        """
-
+        """Force windowed mode"""
         if self.engine_name == 'Unity':
             self._add_argument('-popupwindow -screen-fullscreen 0')
             self._log('windowed', 'borderless window')
@@ -203,31 +163,30 @@ class Engine():
             self._add_argument('-windowed')
             self._log('windowed', 'window')
         else:
-            self._log('windowed', 'not supported', True)
+            self._log('windowed', 'not supported', LogLevel.WARN)
             return False
         return True
 
-
-    def resolution(self, res: str = None) -> bool:
-        """ Force screen resolution
-        """
-
+    def resolution(self, res: str) -> bool:
+        """Force screen resolution"""
         if not isinstance(res, str):
-            self._log('resolution', 'not provided')
+            self._log('resolution', 'not provided', LogLevel.WARN)
             return False
 
         res_wh = res.split('x')
 
         if self.engine_name == 'Unity':
-            self._add_argument('-screen-width ' + res_wh[0] + ' -screen-height ' + res_wh[1])
+            self._add_argument(
+                '-screen-width ' + res_wh[0] + ' -screen-height ' + res_wh[1]
+            )
             self._log('resolution', res)
         elif self.engine_name == 'RAGE':
             self._add_argument('-width ' + res_wh[0] + ' -height ' + res_wh[1])
             self._log('resolution', res)
         else:
-            self._log('resolution', 'not supported', True)
+            self._log('resolution', 'not supported', LogLevel.WARN)
             return False
         return True
 
 
-engine = Engine() #pylint: disable=C0103
+engine = Engine()

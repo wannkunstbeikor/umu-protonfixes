@@ -1,10 +1,10 @@
-""" The Blind Prophet
+"""The Blind Prophet
 garbled fonts & No cursive font (Segoe Script)
 """
-#pylint: disable=C0103
 
 from protonfixes import util
 
-def main():
-    util.winedll_override('d3d9', 'd')
+
+def main() -> None:
+    util.winedll_override('d3d9', util.OverrideOrder.DISABLED)
     util.protontricks('segoe_script')

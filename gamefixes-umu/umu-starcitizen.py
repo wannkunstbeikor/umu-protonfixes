@@ -1,37 +1,28 @@
-""" Game fix for Star Citizen
-"""
-#pylint: disable=C0103
+"""Game fix for Star Citizen"""
 
 import os
-from protonfixes import util # pylint: disable=E0401
-from protonfixes.logger import log
+from protonfixes import util
 
-def main():
-    """ EAC Workaround
-    """
 
-    #eac workaround
-    util.set_environment('EOS_USE_ANTICHEATCLIENTNULL','1')
+def main() -> None:
+    # patch libcuda to workaround crashes related to DLSS
+    # See: https://github.com/jp7677/dxvk-nvapi/issues/174#issuecomment-2227462795
+    patched = util.patch_libcuda()
+    if patched:
+        # Satisfy check for the existence of these dlls when trying to initialize ngx
+        # Copy an existing DLL to these three names
+        env_path = os.path.join(util.protonprefix(), 'drive_c', 'windows', 'system32')
+        dest_files = ['cryptbase.dll', 'devobj.dll', 'drvstore.dll']
+        for file in dest_files:
+            link_path = os.path.join(env_path, file)
+            if not os.path.isfile(link_path):
+                os.symlink('security.dll', link_path)
 
-    #needed for nvidia vulkan
-    util.set_environment('WINE_HIDE_NVIDIA_GPU','1')
+    # RSI Launcher depends on powershell
+    util.protontricks('powershell')
 
-    #needed for amd vulkan
-    util.set_environment('dual_color_blend_by_location','true')
+    # RSI Launcher animation
+    util.winedll_override('libglesv2', util.OverrideOrder.BUILTIN)
 
-    #override for white/black launcher
-    util.winedll_override('libglesv2', 'builtin')
-    #override for nvidia cards
-    util.winedll_override('nvapi,nvapi64', 'disabled')
-    #allow the RSI Launcher to auto-update itself
-    util.winedll_override('powershell.exe', 'disabled')
-
-    environments = ["LIVE","PTU","EPTU","TECH-PREVIEW"]
-
-    for env in environments:
-        #launcher fails to create these directories in wine so create them here instead
-        #https://github.com/starcitizen-lug/knowledge-base/wiki#game-updates
-        envPath = os.path.join(util.protonprefix(), "drive_c","Program Files", "Roberts Space Industries", "StarCitizen", env)
-        if not os.path.exists(envPath):
-            os.makedirs(envPath)
-            log("created " + envPath)
+    # SC's shipped EAC Installer fails with ntsync
+    util.disable_ntsync()

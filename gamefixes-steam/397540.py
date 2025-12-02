@@ -1,12 +1,9 @@
-""" Game fix for Borderlands 3
-"""
-#pylint: disable=C0103
+"""Game fix for Borderlands 3"""
+
 from protonfixes import util
 
 
-def main():
-    """ Borderlands 3 vcrun2019 fix
-    """
+def main() -> None:
+    """Borderlands 3"""
     # Fixes the startup process.
-    util.protontricks('vcrun2019')
     util.protontricks('d3dcompiler_47')

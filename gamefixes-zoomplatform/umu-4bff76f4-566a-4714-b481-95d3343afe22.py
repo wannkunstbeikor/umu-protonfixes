@@ -1,10 +1,9 @@
-""" Incoming Trilogy
-"""
-#pylint: disable=C0103
+"""Incoming Trilogy"""
 
 from protonfixes import util
 
-def main():
-    util.winedll_override('d3d8', 'n,b')
-    util.winedll_override('ddraw', 'b')
-    util.winedll_override('winmm', 'n,b')
+
+def main() -> None:
+    util.winedll_override('d3d8', util.OverrideOrder.NATIVE_BUILTIN)
+    util.winedll_override('ddraw', util.OverrideOrder.BUILTIN)
+    util.winedll_override('winmm', util.OverrideOrder.NATIVE_BUILTIN)

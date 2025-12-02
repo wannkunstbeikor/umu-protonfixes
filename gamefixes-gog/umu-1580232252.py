@@ -1,9 +1,8 @@
-""" Resident Evil (1997)
-"""
-#pylint: disable=C0103
+"""Resident Evil (1997)"""
 
 from protonfixes import util
 
-def main():
-    util.winedll_override('ddraw', 'n,b')
-    util.winedll_override('dinput', 'n,b')
+
+def main() -> None:
+    util.winedll_override('ddraw', util.OverrideOrder.NATIVE_BUILTIN)
+    util.winedll_override('dinput', util.OverrideOrder.NATIVE_BUILTIN)

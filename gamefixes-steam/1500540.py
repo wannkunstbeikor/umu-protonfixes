@@ -1,9 +1,10 @@
-""" Hardwar
-"""
-#pylint: disable=C0103
+"""Hardwar"""
 
 from protonfixes import util
 
-def main():
-    util.winedll_override('dinput', 'n,b') # DxWrapper component
-    util.winedll_override('winmm', 'n,b') # Music playback
+
+def main() -> None:
+    util.winedll_override(
+        'dinput', util.OverrideOrder.NATIVE_BUILTIN
+    )  # DxWrapper component
+    util.winedll_override('winmm', util.OverrideOrder.NATIVE_BUILTIN)  # Music playback
